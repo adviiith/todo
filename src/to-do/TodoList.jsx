@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react"
 import "./TodoList.css"
+import Timetable from "./Timetable"
 
-const TodoListApp = () => {
+const TodoList = () => {
   const [tasks, setTasks] = useState(() => {
     const savedTasks = localStorage.getItem("tasks")
     return savedTasks ? JSON.parse(savedTasks) : []
@@ -19,11 +20,15 @@ const TodoListApp = () => {
   const [editText, setEditText] = useState("")
   const [dueDate, setDueDate] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
-  const [categories, setCategories] = useState(["Scaler", "Personal", "Freelancing", "Verdict.ai"])
+  const [categories, setCategories] = useState(() => {
+    const savedCategories = localStorage.getItem("categories")
+    return savedCategories ? JSON.parse(savedCategories) : ["Scaler", "Personal", "Freelancing", "Verdict.ai"]
+  })
   const [selectedCategory, setSelectedCategory] = useState("Personal")
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [view, setView] = useState("list")
   const [showSidebar, setShowSidebar] = useState(true)
+  const [showTimetable, setShowTimetable] = useState(false)
 
   useEffect(() => {
     localStorage.setItem("tasks", JSON.stringify(tasks))
@@ -34,9 +39,18 @@ const TodoListApp = () => {
     document.body.className = darkMode ? "dark-mode" : "light-mode"
   }, [darkMode])
 
+  useEffect(() => {
+    localStorage.setItem("categories", JSON.stringify(categories))
+  }, [categories])
+
   const handleAddTask = (e) => {
     e.preventDefault()
     if (newTask.trim() === "") return
+
+    // Check if category exists, if not create it
+    if (!categories.includes(selectedCategory)) {
+      addCategory(selectedCategory)
+    }
 
     const task = {
       id: Date.now(),
@@ -73,6 +87,11 @@ const TodoListApp = () => {
   const saveEditTask = () => {
     if (editText.trim() === "") return
 
+    // Check if category exists, if not create it
+    if (!categories.includes(selectedCategory)) {
+      addCategory(selectedCategory)
+    }
+
     setTasks(
       tasks.map((task) =>
         task.id === editTask
@@ -93,6 +112,31 @@ const TodoListApp = () => {
   const addCategory = (categoryName) => {
     if (categoryName && !categories.includes(categoryName)) {
       setCategories([...categories, categoryName])
+    }
+  }
+
+  const deleteCategory = (categoryName) => {
+    // Don't delete if it's the only category
+    if (categories.length <= 1) {
+      alert("You must have at least one category")
+      return
+    }
+
+    // Update tasks that belong to this category
+    const defaultCategory = categories.find(cat => cat !== categoryName) || "Uncategorized"
+    
+    setTasks(
+      tasks.map((task) =>
+        task.category === categoryName ? { ...task, category: defaultCategory } : task
+      )
+    )
+
+    // Remove the category
+    setCategories(categories.filter((cat) => cat !== categoryName))
+    
+    // If the selected category is being deleted, change it
+    if (selectedCategory === categoryName) {
+      setSelectedCategory(defaultCategory)
     }
   }
 
@@ -256,6 +300,7 @@ const TodoListApp = () => {
                 onClick={() => {
                   setView("list")
                   setFilter("all")
+                  setShowTimetable(false)
                 }}
               >
                 <span className="menu-icon">📋</span> All Tasks
@@ -265,6 +310,7 @@ const TodoListApp = () => {
                 onClick={() => {
                   setView("list")
                   setFilter("active")
+                  setShowTimetable(false)
                 }}
               >
                 <span className="menu-icon">🔄</span> In Progress
@@ -274,6 +320,7 @@ const TodoListApp = () => {
                 onClick={() => {
                   setView("list")
                   setFilter("completed")
+                  setShowTimetable(false)
                 }}
               >
                 <span className="menu-icon">✅</span> Completed
@@ -283,6 +330,7 @@ const TodoListApp = () => {
                 onClick={() => {
                   setView("list")
                   setFilter("high-priority")
+                  setShowTimetable(false)
                 }}
               >
                 <span className="menu-icon">🔥</span> High Priority
@@ -292,6 +340,7 @@ const TodoListApp = () => {
                 onClick={() => {
                   setView("list")
                   setFilter("upcoming")
+                  setShowTimetable(false)
                 }}
               >
                 <span className="menu-icon">⏰</span> Upcoming
@@ -301,12 +350,28 @@ const TodoListApp = () => {
                 onClick={() => {
                   setView("list")
                   setFilter("overdue")
+                  setShowTimetable(false)
                 }}
               >
                 <span className="menu-icon">⚠️</span> Overdue
               </li>
-              <li className={view === "analytics" ? "active" : ""} onClick={() => setView("analytics")}>
+              <li 
+                className={view === "analytics" ? "active" : ""} 
+                onClick={() => {
+                  setView("analytics")
+                  setShowTimetable(false)
+                }}
+              >
                 <span className="menu-icon">📊</span> Analytics
+              </li>
+              <li 
+                className={showTimetable ? "active" : ""} 
+                onClick={() => {
+                  setShowTimetable(true)
+                  setView("timetable")
+                }}
+              >
+                <span className="menu-icon">📅</span> Timetable
               </li>
             </ul>
 
@@ -318,10 +383,21 @@ const TodoListApp = () => {
                 <li
                   key={category}
                   className={selectedCategory === category ? "active" : ""}
-                  onClick={() => setSelectedCategory(category)}
                 >
-                  <span className="menu-icon">🔖</span> {category}
-                  <span className="category-count">{tasks.filter((task) => task.category === category).length}</span>
+                  <div className="category-item" onClick={() => setSelectedCategory(category)}>
+                    <span className="menu-icon">🔖</span> {category}
+                    <span className="category-count">{tasks.filter((task) => task.category === category).length}</span>
+                  </div>
+                  <button 
+                    className="delete-category-btn" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteCategory(category);
+                    }}
+                    title="Delete category"
+                  >
+                    🗑️
+                  </button>
                 </li>
               ))}
               <li className="add-category">
@@ -341,7 +417,9 @@ const TodoListApp = () => {
         )}
 
         <div className="content">
-          {view === "list" && (
+          {showTimetable ? (
+            <Timetable darkMode={darkMode} tasks={tasks} categories={categories} />
+          ) : view === "list" ? (
             <>
               <div className="add-task-card">
                 <form onSubmit={handleAddTask} className="add-task-form">
@@ -372,6 +450,19 @@ const TodoListApp = () => {
                         </option>
                       ))}
                     </select>
+
+                    <input
+                      type="text"
+                      list="categories-list"
+                      placeholder="Or type new category"
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="category-select"
+                    />
+                    <datalist id="categories-list">
+                      {categories.map((category) => (
+                        <option key={category} value={category} />
+                      ))}
+                    </datalist>
 
                     <input
                       type="date"
@@ -514,9 +605,7 @@ const TodoListApp = () => {
                 </div>
               )}
             </>
-          )}
-
-          {view === "analytics" && (
+          ) : (
             <div className="analytics-view">
               <h2 className="analytics-title">Task Analytics</h2>
 
@@ -620,5 +709,4 @@ const TodoListApp = () => {
   )
 }
 
-export default TodoListApp
-
+export default TodoList

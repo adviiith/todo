@@ -1019,7 +1019,8 @@
   .category-distribution {
     display: flex;
     flex-direction: column;
-    gap:}
+    gap: 1rem;
+  }
   
   .priority-bar-container,
   .category-item {
